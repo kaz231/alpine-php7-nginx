@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/kaz231/alpine-php7-nginx.svg?branch=master)](https://travis-ci.org/kaz231/alpine-php7-nginx)
+
 PHP7-nginx Docker Images
 ========================
 
@@ -33,3 +35,8 @@ ansible-playbook tests/<image>/tests.yml -i tests/localhost -c local
 ```
 
 where __image__ is e.g. alpine-php7-nginx.
+
+### Change-log
+
+* __0.1.0__:
+  - initial version

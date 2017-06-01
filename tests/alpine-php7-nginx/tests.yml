@@ -1,0 +1,145 @@
+---
+- name: Verify if php7-fpm is installed
+  hosts: localhost
+  tasks:
+    - name: Run kaz231/alpine-php7-nginx image
+      shell: "docker run --rm kaz231/alpine-php7-nginx php-fpm -v"
+      register: php_fpm_version
+
+    - name: Assert php-fpm is present
+      assert:
+        that:
+          - "php_fpm_version.stdout.find('/bin/sh: php-fpm: not found') == -1"
+          - "php_fpm_version.stdout.find('PHP 7') != -1"
+          - "php_fpm_version.stdout.find('fpm-fcgi') != -1"
+
+- name: Verify if nginx is installed
+  hosts: localhost
+  tasks:
+    - name: Run kaz231/alpine-php7-nginx image
+      shell: "docker run --rm kaz231/alpine-php7-nginx nginx -v"
+      register: nginx_version
+
+    - name: Assert nginx is present
+      assert:
+        that:
+          - "nginx_version.stdout.find('/bin/sh: nginx: not found') == -1"
+
+- name: Verify if supervisor is installed
+  hosts: localhost
+  tasks:
+    - name: Run kaz231/alpine-php7-nginx image
+      shell: "docker run --rm kaz231/alpine-php7-nginx supervisord -v"
+      register: supervisor_version
+
+    - name: Assert supervisor is present
+      assert:
+        that:
+          - "nginx_version.stdout.find('/bin/sh: supervisord: not found') == -1"
+
+- name: Verify if nginx is running
+  hosts: localhost
+  tasks:
+    - name: Run kaz231/alpine-php7-nginx image
+      shell: "docker run -d --name 'alpine-php7-nginx' kaz231/alpine-php7-nginx"
+
+    - pause:
+        seconds: 2
+
+    - name: Fetch status of the process
+      shell: "docker exec alpine-php7-nginx ps aux"
+      register: nginx_process
+
+    - name: Assert that nginx process is running
+      assert:
+        that:
+          - "nginx_process.stdout.find('nginx') != -1"
+
+    - name: Kill image
+      shell: "docker rm -f 'alpine-php7-nginx'"
+
+- name: Verify if phg-fpm is running
+  hosts: localhost
+  tasks:
+    - name: Run kaz231/alpine-php7-nginx image
+      shell: "docker run -d --name 'alpine-php7-nginx' kaz231/alpine-php7-nginx"
+
+    - pause:
+        seconds: 2
+
+    - name: Fetch status of the process
+      shell: "docker exec alpine-php7-nginx ps aux | grep 'php-fpm'"
+      register: php_fpm_process
+
+    - name: Assert that php-fpm process is running
+      assert:
+        that:
+          - "php_fpm_process.stdout.find('php-fpm') != -1"
+
+    - name: Kill image
+      shell: docker rm -f 'alpine-php7-nginx'
+
+- name: "Verify if port 8080 is exposed"
+  hosts: localhost
+  tasks:
+    - name: Run kaz231/alpine-php7-nginx image
+      shell: "docker run -d --name 'alpine-php7-nginx' kaz231/alpine-php7-nginx"
+
+    - pause:
+        seconds: 2
+
+    - name: Install iproute2
+      shell: "docker exec -u root 'alpine-php7-nginx' apk add -U iproute2"
+
+    - name: Get status of port 8080
+      shell: "docker exec 'alpine-php7-nginx' ss -ltn | grep 8080 | awk '{print $4}'"
+      register: port_state
+
+    - name: Assert that port 8080 has listen state
+      assert:
+        that:
+          - "port_state.stdout == '*:8080'"
+
+    - name: Kill image
+      shell: "docker rm -f 'alpine-php7-nginx'"
+
+- name: "Verify if php application is available"
+  hosts: localhost
+  tasks:
+    - name: Build test image
+      shell: "docker build -f {{ playbook_dir }}/Dockerfile -t kaz231/alpine-php7-nginx-test ."
+
+    - name: Run kaz231/alpine-php7-nginx image with test application
+      shell: "docker run -d -p 8080:8080 --name 'alpine-php7-nginx' kaz231/alpine-php7-nginx-test"
+
+    - pause:
+        seconds: 2
+
+    - name: Get content of application by providing php file
+      uri:
+        url: http://localhost:8080/app.php
+        method: GET
+        return_content: yes
+      register: application_content
+
+    - name: Assert that application is reachable
+      assert:
+        that:
+          - "application_content.content == 'Hello world!'"
+
+    - name: Get content of the application for the default path
+      uri:
+        url: http://localhost:8080/
+        method: GET
+        return_content: yes
+      register: application_content
+
+    - name: Assert that application is reachable
+      assert:
+        that:
+          - "application_content.content == 'Hello world!'"
+
+    # Add test case for 404 code returned by any other php file than app.php
+
+    - name: Kill image
+      shell: "docker rm -f 'alpine-php7-nginx'"

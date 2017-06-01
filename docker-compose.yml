@@ -1,0 +1,12 @@
+version: "2"
+
+services:
+  alpine-php7-nginx:
+    build:
+      context: ./
+      dockefile: Dockerfile
+
+  alpine-php7-nginx-dev:
+    build:
+      context: ./
+      dockefile: Dockerfile.dev
